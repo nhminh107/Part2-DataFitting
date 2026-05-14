@@ -46,9 +46,6 @@ def predict(X, beta_hat):
 def ols_fit(X, y):
     """
     Ordinary Least Squares
-
-    β̂ = (XᵀX)⁻¹ Xᵀy
-    σ̂² = ‖y − Xβ̂‖² / (n − p − 1)
     """
     X_mat = add_intercept(X)
     y_vec = to_1d_list(y)
@@ -76,22 +73,13 @@ def ols_fit(X, y):
     # Bước 5: β̂ = (XᵀX)⁻¹ Xᵀy
     beta_hat = matvec(XtX_inv, Xty)
 
-    # Bước 6-8: ŷ, ε̂, RSS
+    # Tính σ̂² = RSS / (n - p - 1)
     y_hat = matvec(X_mat, beta_hat)
     residuals = [y_vec[i] - y_hat[i] for i in range(n)]
     rss = sum(r * r for r in residuals)
-
-    # Bước 9: σ̂² = RSS / (n - p - 1)
     sigma2_hat = rss / (n - k)
 
-    return {
-        'beta_hat': np.array(beta_hat),
-        'sigma2_hat': sigma2_hat,
-        'y_hat': np.array(y_hat),
-        'residuals': np.array(residuals),
-        'rss': rss,
-        'X_design': np.array(X_mat),
-    }
+    return beta_hat, sigma2_hat
 
 
 
