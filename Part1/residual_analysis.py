@@ -2,13 +2,12 @@ import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
-# Import các hàm từ file của đồng đội
 from hat_matrix import hat_matrix
 from helper_function import add_intercept
 
 def residual_plots(X, y, beta_hat):
     """
-    Vẽ 4 biểu đồ phân tích phần dư[cite: 172].
+    Vẽ 4 biểu đồ phân tích phần dư
     X: list of lists (không chứa cột 1)
     y: list 1 chiều
     beta_hat: list 1 chiều (chứa beta_0 ở vị trí đầu)
