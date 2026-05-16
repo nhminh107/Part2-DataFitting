@@ -1,4 +1,4 @@
-\section{Hồi quy Ridge (Ridge Regression)}
+\subsection{Hồi quy Ridge (Ridge Regression)}
 
 Hồi quy Ridge là một kỹ thuật chính quy hóa được sử dụng để giải quyết vấn đề đa cộng tuyến và quá khớp. Khác với OLS truyền thống, Ridge Regression thêm một thành phần phạt $L_2$ vào hàm mất mát để hạn chế độ lớn của các hệ số hồi quy.
 
@@ -20,10 +20,10 @@ Nghiệm của bài toán tối ưu (dạng đóng) là:
 \end{equation}
 Trong đó $I'$ là ma trận đơn vị đã được điều chỉnh (thường đặt phần tử $I'_{0,0} = 0$ để không thực hiện chính quy hóa cho hệ số chặn $\beta_0$).
 
-\subsection{Biểu đồ Ridge Trace}
+\subsubsection{Biểu đồ Ridge Trace}
 Ridge Trace là biểu đồ thể hiện sự thay đổi của các hệ số hồi quy $\beta_j$ theo các giá trị khác nhau của $\lambda$. Biểu đồ này giúp trực quan hóa quá trình "co rút" của các biến và hỗ trợ việc lựa chọn $\lambda$ phù hợp.
 
-\section{Kiểm định chéo K-Fold (K-Fold Cross-Validation)}
+\subsection{Kiểm định chéo K-Fold (K-Fold Cross-Validation)}
 
 Để đánh giá hiệu năng của mô hình một cách khách quan và lựa chọn tham số $\lambda$ tối ưu, chúng ta sử dụng kỹ thuật K-Fold Cross-Validation.
 
@@ -43,5 +43,5 @@ Quy trình thực hiện bao gồm các bước:
     \end{equation}
 \end{enumerate}
 
-\subsection{Lựa chọn tham số $\lambda$}
+\subsubsection{Lựa chọn tham số $\lambda$}
 Chúng ta thực hiện K-Fold CV trên một lưới các giá trị $\lambda$ khác nhau. Giá trị $\lambda$ cho $CV_{(k)}$ nhỏ nhất sẽ được chọn làm tham số tối ưu cho mô hình cuối cùng.

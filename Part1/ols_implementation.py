@@ -5,6 +5,9 @@ from Part1.helper_function import (
 import math 
 import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.linear_model import LinearRegression
 
 def model_metrics(y_true, y_pred, p):
     """
@@ -148,6 +151,37 @@ def ols_fit(X, y):
 
     return beta_hat, sigma2_hat
 
+def hat_matrix(X):
+    """
+    Tính Hat Matrix H = X(XᵀX)⁻¹Xᵀ và kiểm tra tính Idempotent.
+    """
+    X_mat = add_intercept(X)
+    n = len(X_mat)
+
+    Xt = transpose_matrix(X_mat)
+    
+    # Bước 2: XᵀX
+    XtX = matmul(Xt, X_mat)
+
+    # Bước 3: (XᵀX)⁻¹
+    XtX_inv = invert_matrix(XtX)
+
+    # Bước 4: H = X (XᵀX)⁻¹ Xᵀ
+    M1 = matmul(X_mat, XtX_inv)
+    H = matmul(M1, Xt)
+
+    # Kiểm tra tính Idempotent (H² = H)
+    H2 = matmul(H, H)
+    is_idempotent = True
+    for i in range(n):
+        for j in range(n):
+            if abs(H2[i][j] - H[i][j]) > 1e-9:
+                is_idempotent = False
+                break
+        if not is_idempotent:
+            break
+
+    return H, is_idempotent
 
 def std_error(sigma2, X): 
     XT_X_inverse = invert_matrix(matmul(transpose_matrix(X), X))
@@ -159,7 +193,7 @@ def std_error(sigma2, X):
         se_list.append(SE_j) 
 
     return tuple(se_list)
-import math
+
 
 def get_t_critical(df):
     # Bảng tra cứu t-critical cho alpha = 0.05 (kiểm định 2 phía)
@@ -221,3 +255,123 @@ def coef_inference(X, y, beta_hat, sigma2):
         "Confidence Intervals": conf_intervals,
         "Significance_at_5pct": significance
     }
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(0)
+    _ols_fit = ols_fit
+
+    def ols_fit(X, y):
+        if hasattr(X, "values"):
+            X = X.values.tolist()
+        return _ols_fit(X, y)
+
+    def make_xy(n, p, noise, collinear=False):
+        X = rng.normal(size=(n, p))
+        if collinear and p >= 2:
+            X[:, 1] = X[:, 0] + 0.1 * rng.normal(size=n)
+        beta = rng.normal(size=p + 1)
+        y = beta[0] + X @ beta[1:] + noise * rng.normal(size=n)
+        return X, y
+
+    def make_x(n, p, collinear=False):
+        X = rng.normal(size=(n, p))
+        if collinear and p >= 2:
+            X[:, 1] = X[:, 0] + 0.1 * rng.normal(size=n)
+        return X
+
+    ols_cases = [
+        (120, 3, 0.1, False),
+        (60, 1, 0.1, False),
+        (200, 10, 0.1, False),
+        (120, 4, 5.0, False),
+        (150, 3, 0.2, True),
+    ]
+    for idx, (n, p, noise, collinear) in enumerate(ols_cases, 1):
+        print(f"ols_fit case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
+        X, y = make_xy(n, p, noise, collinear)
+        beta_hat, _ = ols_fit(X, y)
+        Xc = np.hstack([np.ones((n, 1)), X])
+        beta_np = np.linalg.lstsq(Xc, y, rcond=None)[0]
+        np.testing.assert_allclose(beta_hat, beta_np, rtol=1e-3, atol=1e-3)
+
+    hat_cases = [
+        (80, 3, False),
+        (40, 1, False),
+        (120, 8, False),
+        (100, 4, False),
+        (120, 3, True),
+    ]
+    for idx, (n, p, collinear) in enumerate(hat_cases, 1):
+        print(f"hat_matrix case {idx}: n={n} p={p} collinear={collinear}")
+        X = make_x(n, p, collinear)
+        H, is_idempotent = hat_matrix(X)
+        Xc = np.hstack([np.ones((n, 1)), X])
+        H_ref = Xc @ np.linalg.inv(Xc.T @ Xc) @ Xc.T
+        H_np = np.array(H)
+        np.testing.assert_allclose(H_np, H_ref, rtol=1e-4, atol=1e-4)
+        np.testing.assert_allclose(H_np @ H_np, H_np, atol=1e-6)
+        assert is_idempotent
+
+    metrics_cases = [
+        (120, 3, 0.1, False),
+        (60, 1, 0.1, False),
+        (200, 10, 0.1, False),
+        (120, 4, 5.0, False),
+        (150, 3, 0.2, True),
+    ]
+    for idx, (n, p, noise, collinear) in enumerate(metrics_cases, 1):
+        print(f"model_metrics case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
+        X, y = make_xy(n, p, noise, collinear)
+        Xc = np.hstack([np.ones((n, 1)), X])
+        beta_np = np.linalg.lstsq(Xc, y, rcond=None)[0]
+        y_hat = Xc @ beta_np
+        metrics = model_metrics(y.tolist(), y_hat.tolist(), p)
+        rss = float(np.sum((y - y_hat) ** 2))
+        tss = float(np.sum((y - np.mean(y)) ** 2))
+        r2_ref = 1 - rss / tss if tss != 0 else 0.0
+        adj_ref = 1 - (1 - r2_ref) * (n - 1) / (n - p - 1)
+        np.testing.assert_allclose(metrics["R2"], r2_ref, rtol=1e-4, atol=1e-4)
+        np.testing.assert_allclose(metrics["Adjusted R2"], adj_ref, rtol=1e-4, atol=1e-4)
+
+    coef_cases = [
+        (120, 3, 0.1, False),
+        (60, 1, 0.1, False),
+        (200, 10, 0.1, False),
+        (120, 4, 5.0, False),
+        (150, 3, 0.2, True),
+    ]
+    for idx, (n, p, noise, collinear) in enumerate(coef_cases, 1):
+        print(f"coef_inference case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
+        X, y = make_xy(n, p, noise, collinear)
+        beta_hat, sigma2 = ols_fit(X, y)
+        Xc = np.hstack([np.ones((n, 1)), X])
+        XtX_inv = np.linalg.inv(Xc.T @ Xc)
+        se_ref = np.sqrt(sigma2 * np.diag(XtX_inv))
+        inf = coef_inference(Xc.tolist(), y.tolist(), [[b] for b in beta_hat], sigma2)
+        np.testing.assert_allclose(inf["Standard Errors"], se_ref, rtol=1e-3, atol=1e-3)
+
+    vif_cases = [
+        (120, 3, False),
+        (80, 2, False),
+        (150, 6, False),
+        (120, 4, False),
+        (120, 3, True),
+    ]
+    for idx, (n, p, collinear) in enumerate(vif_cases, 1):
+        print(f"vif case {idx}: n={n} p={p} collinear={collinear}")
+        X = make_x(n, p, collinear)
+        df = pd.DataFrame(X, columns=[f"x{j}" for j in range(p)])
+        vif_vals = calculate_vif(df)
+        for j in range(p):
+            X_others = np.delete(X, j, axis=1)
+            y_j = X[:, j]
+            Xo = np.hstack([np.ones((n, 1)), X_others])
+            beta_aux = np.linalg.lstsq(Xo, y_j, rcond=None)[0]
+            y_pred = Xo @ beta_aux
+            rss = float(np.sum((y_j - y_pred) ** 2))
+            tss = float(np.sum((y_j - np.mean(y_j)) ** 2))
+            r2_aux = 1 - rss / tss if tss != 0 else 0.0
+            vif_ref = np.inf if r2_aux >= 1.0 else 1.0 / (1.0 - r2_aux)
+            vif_my = vif_vals[f"x{j}"]
+            if np.isfinite(vif_my) and np.isfinite(vif_ref):
+                np.testing.assert_allclose(vif_my, vif_ref, rtol=1e-2, atol=1e-2)

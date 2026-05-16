@@ -72,3 +72,33 @@ def plot_ridge_trace(X, y, alphas, title="Ridge Trace"):
     plt.title(title)
     plt.grid(True, which="both", ls="-", alpha=0.5)
     plt.show()
+
+if __name__ == "__main__":
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+
+    def make_xy(n, p, noise, collinear=False):
+        X = rng.normal(size=(n, p))
+        if collinear and p >= 2:
+            X[:, 1] = X[:, 0] + 0.1 * rng.normal(size=n)
+        beta = rng.normal(size=p + 1)
+        y = beta[0] + X @ beta[1:] + noise * rng.normal(size=n)
+        return X, y
+
+    cases = [
+        (120, 3, 0.2, False),
+        (50, 1, 0.2, False),
+        (200, 12, 0.2, False),
+        (120, 4, 5.0, False),
+        (150, 4, 0.2, True),
+    ]
+
+    for idx, (n, p, noise, collinear) in enumerate(cases, 1):
+        print(f"ridge_fit case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
+        X, y = make_xy(n, p, noise, collinear)
+        X_bias = np.hstack([np.ones((n, 1)), X])
+        beta_my = ridge_fit(X_bias.tolist(), y.tolist(), lam=1.0, fit_intercept=True)
+        lamI = np.diag([0.0] + [1.0] * p)
+        beta_np = np.linalg.inv(X_bias.T @ X_bias + lamI) @ (X_bias.T @ y)
+        np.testing.assert_allclose(beta_my, beta_np, rtol=1e-4, atol=1e-4)

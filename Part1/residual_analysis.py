@@ -80,3 +80,32 @@ def residual_plots(X, y, beta_hat):
     plt.tight_layout()
     plt.savefig('residual_plots.png', dpi=300, bbox_inches='tight')
     plt.show()
+
+if __name__ == "__main__":
+    import numpy as np
+    from ols_implementation import ols_fit
+
+    rng = np.random.default_rng(2)
+    plt.switch_backend("Agg")
+
+    def make_xy(n, p, noise, collinear=False):
+        X = rng.normal(size=(n, p))
+        if collinear and p >= 2:
+            X[:, 1] = X[:, 0] + 0.1 * rng.normal(size=n)
+        beta = rng.normal(size=p + 1)
+        y = beta[0] + X @ beta[1:] + noise * rng.normal(size=n)
+        return X, y
+
+    cases = [
+        (120, 3, 0.2, False),
+        (60, 1, 0.2, False),
+        (100, 8, 0.2, False),
+        (120, 4, 5.0, False),
+        (150, 3, 0.2, True),
+    ]
+
+    for idx, (n, p, noise, collinear) in enumerate(cases, 1):
+        print(f"residual_plots case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
+        X, y = make_xy(n, p, noise, collinear)
+        beta_hat, _ = ols_fit(X, y)
+        residual_plots(X.tolist(), y.tolist(), [b for b in beta_hat])
