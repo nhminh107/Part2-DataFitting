@@ -1,4 +1,5 @@
-import numpy as np
+def _is_sequence(obj):
+    return hasattr(obj, "__iter__") and not isinstance(obj, (str, bytes))
 
 # ============================================================
 # CÁC HÀM ĐẠI SỐ TUYẾN TÍNH (TÍNH TAY) & PHỤ TRỢ
@@ -6,14 +7,31 @@ import numpy as np
 
 def to_2d_list(X):
     """Chuyển đổi input thành mảng 2 chiều (list of lists)."""
-    X_list = np.asarray(X).tolist()
-    if not isinstance(X_list[0], (list, tuple)):
+    if _is_sequence(X):
+        X_list = list(X)
+        if not X_list:
+            return []
+        first = X_list[0]
+        if _is_sequence(first):
+            return [[float(val) for val in row] for row in X_list]
         return [[float(x)] for x in X_list]
-    return [[float(val) for val in row] for row in X_list]
+    return [[float(X)]]
 
 def to_1d_list(y):
     """Chuyển đổi input thành mảng 1 chiều (list)."""
-    return [float(x) for x in np.asarray(y).ravel().tolist()]
+    if _is_sequence(y):
+        y_list = list(y)
+        if not y_list:
+            return []
+        first = y_list[0]
+        if _is_sequence(first):
+            out = []
+            for row in y_list:
+                for val in row:
+                    out.append(float(val))
+            return out
+        return [float(x) for x in y_list]
+    return [float(y)]
 
 def transpose_matrix(A):
     """Chuyển vị ma trận."""
