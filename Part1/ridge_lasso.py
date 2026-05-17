@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from helper_function import transpose, multiply, add, inverse
+from helper_function import transpose_matrix, matmul, add_matrix, invert_matrix
 
 def ridge_fit(X, y, lam, fit_intercept=True):
     """
@@ -24,10 +24,10 @@ def ridge_fit(X, y, lam, fit_intercept=True):
         y_mat = y
 
     # Tính X_transpose
-    XT = transpose(X)
+    XT = transpose_matrix(X)
     
     # Tính X_transpose * X
-    XTX = multiply(XT, X)
+    XTX = matmul(XT, X)
     
     # Tạo ma trận lam * I
     # I là ma trận đơn vị p x p
@@ -39,16 +39,16 @@ def ridge_fit(X, y, lam, fit_intercept=True):
             lamI[i][i] = float(lam)
             
     # A = XTX + lamI
-    A = add(XTX, lamI)
+    A = add_matrix(XTX, lamI)
     
     # Nghịch đảo ma trận A
-    A_inv = inverse(A)
+    A_inv = invert_matrix(A)
     
     # Tính X_transpose * y
-    XTy = multiply(XT, y_mat)
+    XTy = matmul(XT, y_mat)
     
     # Tính beta = A_inv * XTy
-    beta_mat = multiply(A_inv, XTy)
+    beta_mat = matmul(A_inv, XTy)
     
     # Chuyển beta về dạng list phẳng để dễ sử dụng
     beta = [row[0] for row in beta_mat]

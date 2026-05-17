@@ -57,6 +57,16 @@ def matvec(A, v):
         res[i] = sum(A[i][k] * v[k] for k in range(m))
     return res
 
+def add_matrix(A, B):
+    """Cộng hai ma trận."""
+    n = len(A)
+    m = len(A[0])
+    C = [[0.0] * m for _ in range(n)]
+    for i in range(n):
+        for j in range(m):
+            C[i][j] = A[i][j] + B[i][j]
+    return C
+
 def invert_matrix(A):
     """Nghịch đảo ma trận bằng phương pháp khử Gauss-Jordan (có tìm pivot)."""
     n = len(A)
