@@ -1,9 +1,15 @@
 import unittest
 import pandas as pd
 import numpy as np
+import sys
+import os
+
+# Thêm thư mục cha vào sys.path để import được module
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from Part1.ols_implementation import model_metrics, calculate_vif, ols_fit
+from ols_implementation import model_metrics, calculate_vif, ols_fit
 
 class TestOLSMetricsLoc(unittest.TestCase):
     def setUp(self):
@@ -19,12 +25,12 @@ class TestOLSMetricsLoc(unittest.TestCase):
         self.y = self.data['y']
         
         #tính beta_hat bằng ols_fit
-        self.beta_hat, _ = ols_fit(self.X, self.y)
+        self.beta_hat, _ = ols_fit(self.X.values.tolist(), self.y.tolist())
         
         #tính y_pred
         #cần thêm intercept để tính y_pred
         from helper_function import add_intercept, matvec
-        X_with_const = add_intercept(self.X)
+        X_with_const = add_intercept(self.X.values.tolist())
         self.y_pred = matvec(X_with_const, self.beta_hat)
         
         self.y_true = self.y.tolist()

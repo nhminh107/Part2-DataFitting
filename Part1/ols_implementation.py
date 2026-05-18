@@ -77,7 +77,7 @@ def calculate_vif(X_df):
         
         try:
             #ols_fit trả về (beta_hat, sigma2_hat)
-            beta_hat, _ = ols_fit(X_others, y)
+            beta_hat, _ = ols_fit(X_others.values.tolist(), y)
             
             #dự báo y_hat cho hồi quy phụ
             #thêm intercept vào X_others để tính y_hat
