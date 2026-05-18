@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from helper_function import transpose_matrix, matmul, add_matrix, invert_matrix
+from Part1.helper_function import transpose_matrix, matmul, add_matrix, invert_matrix
 
 def ridge_fit(X, y, lam, fit_intercept=True):
     """

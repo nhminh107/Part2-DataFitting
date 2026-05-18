@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from ols_implementation import model_metrics, calculate_vif
-from ols_fit import ols_fit
+from Part1.ols_implementation import model_metrics, calculate_vif, ols_fit
 
 class TestOLSMetricsLoc(unittest.TestCase):
     def setUp(self):

@@ -1,4 +1,4 @@
-from Part1.helper_function import (
+from helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 
     matmul, matvec, invert_matrix, add_intercept
 )
