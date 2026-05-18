@@ -1,0 +1,97 @@
+\subsection{Hàm \texttt{model\_metrics}}
+
+\subsubsection{Cơ sở lý thuyết}
+Để đánh giá độ phù hợp của mô hình hồi quy tuyến tính, chúng ta sử dụng các chỉ số thống kê quan trọng dựa trên sự phân rã tổng bình phương các sai lệch. Các chỉ số cốt lõi bao gồm:
+
+\begin{itemize}
+    \item \textbf{RSS (Residual Sum of Squares):} Tổng bình phương các phần dư, đo lường phần biến thiên của biến phụ thuộc không được giải thích bởi mô hình.
+    \begin{equation}
+        RSS = \sum_{i=1}^{n} (y_i - \hat{y}_i)^2
+    \end{equation}
+    
+    \item \textbf{TSS (Total Sum of Squares):} Tổng bình phương tổng thể, đo lường tổng biến thiên của biến phụ thuộc xung quanh giá trị trung bình.
+    \begin{equation}
+        TSS = \sum_{i=1}^{n} (y_i - \bar{y})^2
+    \end{equation}
+    
+    \item \textbf{Hệ số xác định $R^2$:} Tỷ lệ biến thiên của biến phụ thuộc được giải thích bởi các biến độc lập trong mô hình.
+    \begin{equation}
+        R^2 = 1 - \frac{RSS}{TSS}
+    \end{equation}
+    
+    \item \textbf{Hệ số xác định hiệu chỉnh $\bar{R}^2$:} Hiệu chỉnh $R^2$ để tránh việc tăng ảo khi thêm biến vào mô hình, có tính đến bậc tự do.
+    \begin{equation}
+        \bar{R}^2 = 1 - (1 - R^2) \frac{n-1}{n-p-1}
+    \end{equation}
+    
+    \item \textbf{Kiểm định F (F-test):} Đánh giá ý nghĩa tổng thể của mô hình. Giả thuyết $H_0$ cho rằng tất cả các hệ số hồi quy (trừ hệ số chặn) đều bằng 0.
+    \begin{equation}
+        F = \frac{(TSS - RSS) / p}{RSS / (n - p - 1)}
+    \end{equation}
+\end{itemize}
+
+\subsubsection{Xây dựng hàm}
+Hàm \texttt{model\_metrics} được xây dựng tập trung vào việc tính toán tường minh các đại lượng sai lệch bình phương.
+
+\paragraph{Tính toán RSS và TSS:}
+Sử dụng \textit{list comprehension} kết hợp với hàm \texttt{sum()} để tối ưu hóa hiệu suất và giữ mã nguồn ngắn gọn:
+\begin{lstlisting}[language=Python, caption=Tính toán RSS và TSS]
+# RSS: Residual Sum of Squares
+rss = sum((yt - yp)**2 for yt, yp in zip(y_true, y_pred))
+
+# TSS: Total Sum of Squares
+tss = sum((yt - y_mean)**2 for yt in y_true)
+\end{lstlisting}
+Đoạn mã trên sử dụng \texttt{zip} để ghép cặp giá trị thực và giá trị dự báo, sau đó tính bình phương hiệu số.
+
+\paragraph{Tính toán các chỉ số phái sinh:}
+Sau khi có RSS và TSS, các chỉ số còn lại được tính theo công thức lý thuyết, kèm theo kiểm tra điều kiện để tránh lỗi chia cho 0:
+\begin{lstlisting}[language=Python, caption=Tính toán R2 và F-statistic]
+# R^2: Coefficient of Determination
+r2 = 1 - (rss / tss) if tss != 0 else 0
+
+# F-statistic
+if rss == 0:
+    f_stat = float('inf')
+else:
+    f_stat = ((tss - rss) / p) / (rss / (n - p - 1))
+\end{lstlisting}
+
+\subsection{Hàm \texttt{calculate\_vif}}
+
+\subsubsection{Cơ sở lý thuyết}
+Hệ số phóng đại phương sai (Variance Inflation Factor - VIF) đo lường mức độ ảnh hưởng của đa cộng tuyến. VIF của biến $X_j$ được tính bằng:
+\begin{equation}
+    VIF_j = \frac{1}{1 - R_j^2}
+\end{equation}
+Trong đó $R_j^2$ là hệ số xác định khi hồi quy biến $X_j$ theo tất cả các biến độc lập khác trong mô hình.
+
+\subsubsection{Xây dựng hàm}
+Hàm \texttt{calculate\_vif} thực hiện quy trình hồi quy lặp đi lặp lại cho từng đặc trưng.
+
+\paragraph{Thiết lập hồi quy phụ:}
+Với mỗi cột, chúng ta tách dữ liệu và chuẩn bị ma trận thiết kế cho mô hình OLS phụ:
+\begin{lstlisting}[language=Python, caption=Chuẩn bị dữ liệu cho hồi quy phụ]
+for feature in features:
+    # Biến mục tiêu phụ là feature hiện tại
+    y = X_df[feature].tolist()
+    
+    # Các biến độc lập phụ là các feature còn lại
+    other_features = [f for f in features if f != feature]
+    X_others = X_df[other_features]
+\end{lstlisting}
+
+\paragraph{Giải OLS và tính VIF:}
+Tận dụng hàm \texttt{ols\_fit} đã được cài đặt để tìm nghiệm tối ưu, sau đó tính toán VIF dựa trên kết quả $R^2$ thu được từ hàm \texttt{model\_metrics}:
+\begin{lstlisting}[language=Python, caption=Tính toán VIF từ nghiệm đóng]
+# Sử dụng ols_fit để giải hồi quy phụ
+beta_hat, _ = ols_fit(X_others, y)
+
+# Lấy R2 từ hàm metrics
+metrics = model_metrics(y, y_pred_aux, len(other_features))
+r2_aux = metrics["R2"]
+
+# Tính VIF
+vif = 1 / (1 - r2_aux) if r2_aux < 1 else float('inf')
+\end{lstlisting}
+Việc tái sử dụng \texttt{ols\_fit} giúp đảm bảo tính nhất quán trong phương pháp tính toán của toàn bộ đồ án.
