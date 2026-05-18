@@ -1,10 +1,9 @@
 import random
 import sys
 import os
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from residual_analysis import residual_plots
-from ols_fit import ols_fit 
+from ols_implementation import ols_fit 
 
 def run_test():
     print("--- BẮT ĐẦU TEST HÀM RESIDUAL PLOTS ---")

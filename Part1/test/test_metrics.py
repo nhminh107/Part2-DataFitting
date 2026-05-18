@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
 from ols_implementation import model_metrics, calculate_vif, ols_fit
-
+from helper_function import add_intercept, matvec
 class TestOLSMetricsLoc(unittest.TestCase):
     def setUp(self):
         #tạo dữ liệu giả lập
@@ -26,10 +26,7 @@ class TestOLSMetricsLoc(unittest.TestCase):
         
         #tính beta_hat bằng ols_fit
         self.beta_hat, _ = ols_fit(self.X.values.tolist(), self.y.tolist())
-        
-        #tính y_pred
-        #cần thêm intercept để tính y_pred
-        from helper_function import add_intercept, matvec
+
         X_with_const = add_intercept(self.X.values.tolist())
         self.y_pred = matvec(X_with_const, self.beta_hat)
         

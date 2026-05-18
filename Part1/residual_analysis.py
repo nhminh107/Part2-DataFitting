@@ -1,9 +1,8 @@
 import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-
-from Part1.ols_implementation import hat_matrix
-from Part1.helper_function import add_intercept
+from ols_implementation import hat_matrix
+from helper_function import add_intercept
 
 def residual_plots(X, y, beta_hat):
     """
@@ -12,6 +11,9 @@ def residual_plots(X, y, beta_hat):
     y: list 1 chiều
     beta_hat: list 1 chiều (chứa beta_0 ở vị trí đầu)
     """
+    if plt is None or stats is None:
+        raise ImportError("matplotlib and scipy are required for residual_plots. Install them with: pip install matplotlib scipy")
+    
     n = len(y)
     p = len(X[0]) # Số lượng biến đặc trưng
     
@@ -81,31 +83,4 @@ def residual_plots(X, y, beta_hat):
     plt.savefig('residual_plots.png', dpi=300, bbox_inches='tight')
     plt.show()
 
-if __name__ == "__main__":
-    import numpy as np
-    from ols_implementation import ols_fit
 
-    rng = np.random.default_rng(2)
-    plt.switch_backend("Agg")
-
-    def make_xy(n, p, noise, collinear=False):
-        X = rng.normal(size=(n, p))
-        if collinear and p >= 2:
-            X[:, 1] = X[:, 0] + 0.1 * rng.normal(size=n)
-        beta = rng.normal(size=p + 1)
-        y = beta[0] + X @ beta[1:] + noise * rng.normal(size=n)
-        return X, y
-
-    cases = [
-        (120, 3, 0.2, False),
-        (60, 1, 0.2, False),
-        (100, 8, 0.2, False),
-        (120, 4, 5.0, False),
-        (150, 3, 0.2, True),
-    ]
-
-    for idx, (n, p, noise, collinear) in enumerate(cases, 1):
-        print(f"residual_plots case {idx}: n={n} p={p} noise={noise} collinear={collinear}")
-        X, y = make_xy(n, p, noise, collinear)
-        beta_hat, _ = ols_fit(X, y)
-        residual_plots(X.tolist(), y.tolist(), [b for b in beta_hat])
