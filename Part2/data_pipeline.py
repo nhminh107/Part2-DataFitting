@@ -11,7 +11,34 @@ except AttributeError:
     pass
 
 import seaborn as sns
-from sklearn.linear_model import Ridge
+from Part1.ridge_lasso import ridge_fit
+
+class CustomRidge:
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha
+        self.beta = None
+
+    def fit(self, X, y):
+        # Convert to list of lists and add intercept (first column)
+        X_list = X.values.tolist()
+        for row in X_list:
+            row.insert(0, 1.0)
+        y_list = y.values.tolist()
+        # Use custom ridge_fit from Part1
+        self.beta = ridge_fit(X_list, y_list, self.alpha, fit_intercept=True)
+
+    def predict(self, X):
+        if self.beta is None:
+            return None
+        X_list = X.values.tolist()
+        for row in X_list:
+            row.insert(0, 1.0)
+        # Use matmul from helper_function in Part1
+        from helper_function import matmul
+        beta_mat = [[b] for b in self.beta]
+        preds = matmul(X_list, beta_mat)
+        return [p[0] for p in preds]
+
 from sklearn.impute import KNNImputer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
@@ -183,7 +210,8 @@ class DataPipeline:
         return X_df
 
     def _identify_column_types(self, X_df):
-        self.categorical_cols = X_df.select_dtypes(include=['object']).columns.tolist()
+        # Include both 'object' and 'string' to handle newer pandas versions correctly
+        self.categorical_cols = X_df.select_dtypes(include=['object', 'string']).columns.tolist()
         self.numeric_cols = X_df.select_dtypes(include=[np.number]).columns.tolist()
 
     def _fit_basic_impute_values(self, X_df):
@@ -230,8 +258,8 @@ class DataPipeline:
                         X_train_reg = X_temp_encoded.loc[non_null_mask, pred_cols]
                         y_train_reg = X_df.loc[non_null_mask, col]
                         
-                        # We use Ridge regression to perform robust imputation
-                        model = Ridge(alpha=1.0)
+                        # We use custom Ridge implementation from Part1 for regression imputation
+                        model = CustomRidge(alpha=1.0)
                         model.fit(X_train_reg, y_train_reg)
                         self.regression_models[col] = (model, pred_cols)
 

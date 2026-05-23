@@ -1,8 +1,8 @@
 import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
-from ols_implementation import hat_matrix
-from helper_function import add_intercept
+from Part1.ols_implementation import hat_matrix
+from Part1.helper_function import add_intercept
 
 def residual_plots(X, y, beta_hat):
     """
