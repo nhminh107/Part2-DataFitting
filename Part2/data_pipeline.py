@@ -17,32 +17,30 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 
 # Set default settings
-path = os.getcwd() 
-data_path = os.path.join(path, "Part2", "data", "taxi_trip_pricing.csv")
 pd.set_option('display.max_columns', None)
 
 class DataPipeline: 
-    def __init__(self, data_path=None, imputation_method='knn', handle_outliers='winsorize', target_col='Trip_Price'):
+    def __init__(self, data_path=None, imputation_method='knn', handle_outliers='winsorize', target_col='Trip_Price', ordinal_mappings=None):
         self.imputation_method = imputation_method
         self.handle_outliers = handle_outliers
         self.target_col = target_col
         
-        # Maintain backward compatibility with the original constructor
+        # 1. Standardize Data Path Handling
         if data_path is None:
-            # Look in the current working directory or dynamic path
-            cw = os.getcwd()
-            possible_path = os.path.join(cw, "Part2", "data", "taxi_trip_pricing.csv")
-            if os.path.exists(possible_path):
-                self.df = pd.read_csv(possible_path)
-            elif os.path.exists(os.path.join(cw, "data", "taxi_trip_pricing.csv")):
-                self.df = pd.read_csv(os.path.join(cw, "data", "taxi_trip_pricing.csv"))
-            else:
-                self.df = None
+            # Default to data folder relative to this script's location
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            data_path = os.path.join(base_dir, "data", "taxi_trip_pricing.csv")
+        
+        self.df = pd.read_csv(data_path) if os.path.exists(data_path) else None
+        
+        # 2. Ordinal Mappings Setup
+        if ordinal_mappings is None:
+            self.ordinal_mappings = {
+                'Time_of_Day': ['Morning', 'Afternoon', 'Evening', 'Night'],
+                'Traffic_Conditions': ['Low', 'Medium', 'High']
+            }
         else:
-            if os.path.exists(data_path):
-                self.df = pd.read_csv(data_path)
-            else:
-                self.df = None
+            self.ordinal_mappings = ordinal_mappings
 
         # Containers for training statistics
         self.impute_values = {}
@@ -152,8 +150,28 @@ class DataPipeline:
             print(f"Số outlier ở cột {col}:", mask.sum())
 
     def fit(self, X, y=None):
-        X_df = X.copy()
+        X_df = self._prepare_data(X)
         
+        # Identify column types
+        self._identify_column_types(X_df)
+        
+        # Fit imputation models
+        self._fit_basic_impute_values(X_df)
+        self._fit_advanced_imputers(X_df)
+        
+        # Impute data to calculate bounds and scaling on a "complete" dataset
+        X_imputed = self._apply_imputation(X_df)
+        
+        # Fit outlier bounds and scaling parameters
+        self._fit_outlier_bounds_and_scaling(X_imputed)
+        
+        # Determine categorical dummy mappings (Encoding)
+        self._fit_categorical_encoding(X_imputed)
+                
+        return self
+
+    def _prepare_data(self, X):
+        X_df = X.copy()
         # If target column is present in X, drop it (and drop target NaNs if any)
         if self.target_col in X_df.columns:
             X_df = X_df.dropna(subset=[self.target_col])
@@ -162,20 +180,21 @@ class DataPipeline:
         # If imputation is listwise, drop all missing rows from features immediately
         if self.imputation_method == 'listwise':
             X_df = X_df.dropna()
-            
-        # Identify column types
+        return X_df
+
+    def _identify_column_types(self, X_df):
         self.categorical_cols = X_df.select_dtypes(include=['object']).columns.tolist()
         self.numeric_cols = X_df.select_dtypes(include=[np.number]).columns.tolist()
-        
-        # 1. Fit standard values for imputation
+
+    def _fit_basic_impute_values(self, X_df):
         for col in self.categorical_cols:
             mode_val = X_df[col].mode()
             self.impute_values[col] = mode_val.iloc[0] if not mode_val.empty else "Missing"
             
         for col in self.numeric_cols:
             self.impute_values[col] = X_df[col].mean() # Default is mean
-            
-        # 2. Fit advanced imputers
+
+    def _fit_advanced_imputers(self, X_df):
         if self.imputation_method == 'knn':
             X_temp = X_df.copy()
             # Mode fill categoricals to make matrix numerical representation
@@ -194,7 +213,6 @@ class DataPipeline:
         elif self.imputation_method == 'regression':
             X_temp = X_df.copy()
             # Fill both numerical and categorical missing values with basic mean/mode first
-            # to prevent NaN errors when fitting helper Ridge models
             for col in self.categorical_cols:
                 X_temp[col] = X_temp[col].fillna(self.impute_values[col])
             for col in self.numeric_cols:
@@ -212,13 +230,14 @@ class DataPipeline:
                         X_train_reg = X_temp_encoded.loc[non_null_mask, pred_cols]
                         y_train_reg = X_df.loc[non_null_mask, col]
                         
-                        # We use Ridge regression to perform robust imputation without singularity issues
+                        # We use Ridge regression to perform robust imputation
                         model = Ridge(alpha=1.0)
                         model.fit(X_train_reg, y_train_reg)
                         self.regression_models[col] = (model, pred_cols)
-                        
-        # 3. Simulate training imputation to compute Outlier bounds on imputed values
+
+    def _apply_imputation(self, X_df):
         X_imputed = X_df.copy()
+        
         for col in self.categorical_cols:
             X_imputed[col] = X_imputed[col].fillna(self.impute_values[col])
             
@@ -244,37 +263,63 @@ class DataPipeline:
             for col in self.numeric_cols:
                 X_imputed[col] = X_imputed[col].fillna(self.impute_values[col])
         elif self.imputation_method == 'listwise':
-            # NaNs already removed, do nothing
+            # Note: Listwise dropping for transform should be handled in transform method 
+            # to also drop from y. Here we just return as is if already dropped.
             pass
         else: # mean/median/mode
             for col in self.numeric_cols:
                 X_imputed[col] = X_imputed[col].fillna(self.impute_values[col])
-                
-        # 4. Outlier Bounds Calculation & Scaling (Standardization)
+        return X_imputed
+
+    def _fit_outlier_bounds_and_scaling(self, X_imputed):
         for col in self.numeric_cols:
             q1 = X_imputed[col].quantile(0.25)
             q3 = X_imputed[col].quantile(0.75)
             iqr = q3 - q1
             self.outlier_bounds[col] = (q1 - 1.5 * iqr, q3 + 1.5 * iqr)
             
+            # Temporary copy for mean/std if winsorizing
+            col_data = X_imputed[col]
             if self.handle_outliers == 'winsorize':
-                X_imputed[col] = X_imputed[col].clip(self.outlier_bounds[col][0], self.outlier_bounds[col][1])
+                col_data = col_data.clip(self.outlier_bounds[col][0], self.outlier_bounds[col][1])
                 
-            self.scale_means[col] = X_imputed[col].mean()
-            self.scale_stds[col] = X_imputed[col].std()
+            self.scale_means[col] = col_data.mean()
+            self.scale_stds[col] = col_data.std()
             if pd.isna(self.scale_stds[col]) or self.scale_stds[col] == 0:
                 self.scale_stds[col] = 1.0
-                
-        # 5. Determine categorical dummy mappings (avoid perfect multicollinearity)
+
+    def _fit_categorical_encoding(self, X_imputed):
         self.dummy_columns_map = {}
-        for col in self.categorical_cols:
+        # Only fit dummy mappings for columns that are NOT in ordinal_mappings
+        nominal_cols = [col for col in self.categorical_cols if col not in self.ordinal_mappings]
+        
+        for col in nominal_cols:
             unique_vals = sorted(X_imputed[col].unique().tolist())
             if len(unique_vals) > 1:
                 self.dummy_columns_map[col] = unique_vals[1:] # Drop first
             else:
                 self.dummy_columns_map[col] = [] # Avoid dummy trap if 1 category
+
+    def _apply_ordinal_encoding(self, X_df):
+        X_encoded = X_df.copy()
+        for col, order in self.ordinal_mappings.items():
+            if col in X_encoded.columns:
+                mapping_dict = {val: i for i, val in enumerate(order)}
+                X_encoded[col] = X_encoded[col].map(mapping_dict)
+        return X_encoded
+
+    def _apply_nominal_encoding(self, X_df):
+        X_encoded = X_df.copy()
+        nominal_cols = [col for col in self.categorical_cols if col not in self.ordinal_mappings]
+        
+        for col in nominal_cols:
+            for val in self.dummy_columns_map.get(col, []):
+                dummy_col_name = f"{col}_{val}"
+                X_encoded[dummy_col_name] = (X_df[col] == val).astype(float)
                 
-        return self
+        # Drop original nominal categoricals
+        X_encoded = X_encoded.drop(columns=nominal_cols)
+        return X_encoded
 
     def transform(self, X, y=None):
         X_df = X.copy()
@@ -296,57 +341,42 @@ class DataPipeline:
             X_df = X_df.drop(columns=[self.target_col])
             
         # 1. Apply Imputation
-        for col in self.categorical_cols:
-            X_df[col] = X_df[col].fillna(self.impute_values[col])
-            
         if self.imputation_method == 'listwise':
             nan_rows = X_df.isnull().any(axis=1)
             X_df = X_df[~nan_rows]
             if y_df is not None:
                 y_df = y_df[~nan_rows]
-        elif self.imputation_method == 'knn':
-            X_df[self.numeric_cols] = self.knn_imputer.transform(X_df[self.numeric_cols])
-        elif self.imputation_method == 'mice':
-            X_df[self.numeric_cols] = self.mice_imputer.transform(X_df[self.numeric_cols])
-        elif self.imputation_method == 'regression':
-            for col, (model, pred_cols) in self.regression_models.items():
-                null_mask = X_df[col].isnull()
-                if null_mask.any():
-                    X_temp_for_reg = X_df.copy()
-                    for c in self.numeric_cols:
-                        if c != col:
-                            X_temp_for_reg[c] = X_temp_for_reg[c].fillna(self.impute_values[c])
-                    X_temp_encoded = pd.get_dummies(X_temp_for_reg, columns=self.categorical_cols, drop_first=True).astype(float)
-                    for c in pred_cols:
-                        if c not in X_temp_encoded.columns:
-                            X_temp_encoded[c] = 0.0
-                    X_pred = X_temp_encoded.loc[null_mask, pred_cols]
-                    X_df.loc[null_mask, col] = model.predict(X_pred)
-            # final mean fallback
-            for col in self.numeric_cols:
-                X_df[col] = X_df[col].fillna(self.impute_values[col])
-        else: # mean_median_mode
-            for col in self.numeric_cols:
-                X_df[col] = X_df[col].fillna(self.impute_values[col])
+            X_imputed = X_df
+        else:
+            X_imputed = self._apply_imputation(X_df)
                 
         # 2. Apply Outlier Winsorization
         if self.handle_outliers == 'winsorize':
             for col in self.numeric_cols:
                 lower, upper = self.outlier_bounds[col]
-                X_df[col] = X_df[col].clip(lower, upper)
+                X_imputed[col] = X_imputed[col].clip(lower, upper)
                 
         # 3. Categorical encoding
-        X_encoded = X_df.copy()
-        for col in self.categorical_cols:
-            for val in self.dummy_columns_map.get(col, []):
-                dummy_col_name = f"{col}_{val}"
-                X_encoded[dummy_col_name] = (X_df[col] == val).astype(float)
-        # Drop original categoricals
-        X_encoded = X_encoded.drop(columns=self.categorical_cols)
+        # First apply ordinal encoding, then nominal
+        X_encoded = self._apply_ordinal_encoding(X_imputed)
+        X_encoded = self._apply_nominal_encoding(X_encoded)
+        
+        # Add ordinal columns to numeric_cols for standard scaling if they aren't already
+        all_numeric_cols = list(self.numeric_cols)
+        for col in self.ordinal_mappings.keys():
+            if col in X_encoded.columns and col not in all_numeric_cols:
+                all_numeric_cols.append(col)
+                # If these are new to scaling, set default mean/std to avoid KeyError
+                if col not in self.scale_means:
+                    self.scale_means[col] = X_encoded[col].mean()
+                    self.scale_stds[col] = X_encoded[col].std()
+                    if pd.isna(self.scale_stds[col]) or self.scale_stds[col] == 0:
+                        self.scale_stds[col] = 1.0
         
         # 4. Standardize numeric columns
-        for col in self.numeric_cols:
-            X_encoded[col] = (X_encoded[col] - self.scale_means[col]) / self.scale_stds[col]
+        for col in all_numeric_cols:
+            if col in X_encoded.columns:
+                X_encoded[col] = (X_encoded[col] - self.scale_means[col]) / self.scale_stds[col]
             
         if y_df is not None:
             return X_encoded, y_df
@@ -355,7 +385,50 @@ class DataPipeline:
     def fit_transform(self, X, y=None):
         return self.fit(X, y).transform(X, y)
 
-if __name__ == '__main__':
-    # Script entry point to run original EDA
-    dt = DataPipeline()
-    dt.EDA()
+def main():
+    print("--- KHỞI TẠO DATAPIPELINE VỚI CẤU HÌNH ENCODING TÙY CHỈNH ---")
+    
+    ordinal_mappings = {
+        'Traffic_Conditions': ['Low', 'Medium', 'High'],
+        'Time_of_Day': ['Morning', 'Afternoon', 'Evening', 'Night']
+    }
+    
+    pipeline = DataPipeline(ordinal_mappings=ordinal_mappings)
+    
+    if pipeline.df is None:
+        print("Lỗi: Không tìm thấy file dữ liệu taxi_trip_pricing.csv")
+        return
+
+    # 1. Lấy dữ liệu mẫu để chạy thử
+    X = pipeline.df.drop(columns=['Trip_Price'])
+    y = pipeline.df['Trip_Price']
+    
+    print("\n--- DỮ LIỆU GỐC (5 dòng đầu) ---")
+    cols_to_show = ['Traffic_Conditions', 'Time_of_Day', 'Weather', 'Day_of_Week']
+    print(X[cols_to_show].head())
+
+    # 2. Chạy FIT
+    print("\n--- ĐANG THỰC HIỆN FIT... ---")
+    pipeline.fit(X, y)
+    
+    # 3. Chạy TRANSFORM
+    print("--- ĐANG THỰC HIỆN TRANSFORM... ---")
+    X_transformed = pipeline.transform(X)
+    
+    print("\n--- KẾT QUẢ SAU KHI TRANSFORM (5 dòng đầu) ---")
+    # Kiểm tra các cột Ordinal (đã thành số và được scaling)
+    print("\n[Ordinal Encoding - Đã chuyển thành số và chuẩn hóa]")
+    print(X_transformed[['Traffic_Conditions', 'Time_of_Day']].head())
+    
+    # Kiểm tra các cột Nominal (đã thành Dummy và bỏ cột gốc)
+    print("\n[Nominal Encoding - Đã tạo Dummy variables]")
+    dummy_cols = [c for c in X_transformed.columns if 'Weather' in c or 'Day_of_Week' in c]
+    print(X_transformed[dummy_cols].head())
+
+    print("\n--- KIỂM TRA TỔNG THỂ ---")
+    print(f"Số lượng cột ban đầu: {X.shape[1]}")
+    print(f"Số lượng cột sau xử lý: {X_transformed.shape[1]}")
+    print(f"Danh sách tất cả các cột mới:\n{X_transformed.columns.tolist()}")
+
+if __name__ == "__main__":
+    main()

@@ -14,12 +14,12 @@ from sklearn.linear_model import LinearRegression
 
 # Add Part1 to python path to import the custom matrix functions
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Part1')))
-from helper_function import (
+from Part1.helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 
     matmul, matvec, invert_matrix, add_intercept
 )
 
-from data_pipeline import DataPipeline
+from Part2.data_pipeline import DataPipeline
 
 def fit_ols(X, y):
     """
