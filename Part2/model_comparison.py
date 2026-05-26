@@ -10,6 +10,9 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import seaborn as sns
+# Thêm gốc dự án vào python path để import Part1 và Part2
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Part1.helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 
@@ -22,6 +25,7 @@ from Part1.ridge_lasso import ridge_fit, lasso_fit
 from Part1.cross_validation import kfold_cv
 
 from Part2.data_pipeline import DataPipeline
+import scipy.stats as stats
 
 def select_features_vif(X, threshold=5.0):
     """
@@ -141,6 +145,92 @@ def calculate_metrics(y_true, y_pred):
         "R2": r2
     }
 
+def plot_residual_diagnostics(X_matrix, y_true, y_pred, features_list):
+    """
+    Vẽ 4 biểu đồ chẩn đoán phần dư cho mô hình xuất sắc nhất.
+    """
+    residuals = np.array(y_true) - np.array(y_pred)
+    y_pred = np.array(y_pred)
+    n = len(y_true)
+    p = len(features_list)
+    
+    # 1. Tính toán đường chéo Hat Matrix (Leverage h_ii) để phục vụ Cook's Distance
+    # Thêm cột intercept vào X
+    X_mat = np.column_stack([np.ones(n), X_matrix])
+    # H = X * (X^T * X)^(-1) * X^T
+    try:
+        XtX_inv = np.linalg.inv(np.dot(X_mat.T, X_mat))
+        h_ii = np.sum(np.dot(X_mat, XtX_inv) * X_mat, axis=1)
+    except np.linalg.LinAlgError:
+        h_ii = np.ones(n) * (p + 1) / n # Fallback nếu ma trận lỗi
+        
+    # 2. Tính phần dư chuẩn hóa (Standardized Residuals)
+    rss = np.sum(residuals ** 2)
+    sigma2_hat = rss / (n - p - 1)
+    standardized_residuals = residuals / (np.sqrt(sigma2_hat * (1 - h_ii) + 1e-10))
+    
+    # Khởi tạo khung vẽ 4 biểu đồ
+    fig, axes = plt.subplots(2, 2, figsize=(14, 12))
+    plot_dir = os.path.join(os.getcwd(), "Part2", "plot")
+    os.makedirs(plot_dir, exist_ok=True)
+    
+    # Biểu đồ 1: Residuals vs Fitted
+    sns.scatterplot(x=y_pred, y=residuals, ax=axes[0, 0], alpha=0.6)
+    axes[0, 0].axhline(0, color='red', linestyle='--')
+    axes[0, 0].set_title('1. Residuals vs Fitted')
+    axes[0, 0].set_xlabel('Fitted values')
+    axes[0, 0].set_ylabel('Residuals')
+    
+    # Biểu đồ 2: Normal Q-Q plot
+    stats.probplot(standardized_residuals, dist="norm", plot=axes[0, 1])
+    axes[0, 1].set_title('2. Normal Q-Q ')
+    
+    # Biểu đồ 3: Scale-Location plot
+    sns.scatterplot(x=y_pred, y=np.sqrt(np.abs(standardized_residuals)), ax=axes[1, 0], alpha=0.6)
+    axes[1, 0].set_title('3. Scale-Location')
+    axes[1, 0].set_xlabel('Fitted values')
+    axes[1, 0].set_ylabel('$\sqrt{|Standardized\ Residuals|}$')
+    
+    # Biểu đồ 4: Cook's Distance
+    cooks_d = (standardized_residuals**2 / (p + 1)) * (h_ii / (1 - h_ii + 1e-10))
+    axes[1, 1].stem(range(n), cooks_d, markerfmt=",", linefmt="b-")
+    axes[1, 1].set_title("4. Cook's Distance")
+    axes[1, 1].set_xlabel('Observation Index')
+    axes[1, 1].set_ylabel("Cook's Distance")
+    
+    plt.suptitle("4 BIỂU ĐỒ CHẨN ĐOÁN PHẦN DƯ - MÔ HÌNH XUẤT SẮC NHẤT", fontsize=16, color='blue')
+    plt.tight_layout()
+    img_path = os.path.join(plot_dir, "Residual_Diagnostics.png")
+    plt.savefig(img_path, bbox_inches='tight', dpi=300)
+    print(f"-> Đã lưu biểu đồ chẩn đoán phần dư tại: {img_path}")
+    plt.show()
+
+def plot_feature_importance(beta_coefficients, features_list):
+    """
+    Vẽ biểu đồ Feature Importance từ hệ số hồi quy đã chuẩn hóa.
+    """
+    # beta_coefficients bao gồm cả intercept ở vị trí đầu tiên [0], ta loại bỏ nó
+    coefs = beta_coefficients[1:]
+    
+    df_importance = pd.DataFrame({
+        'Feature': features_list,
+        'Coefficient': coefs,
+        'Absolute_Coefficient': np.abs(coefs)
+    }).sort_values(by='Absolute_Coefficient', ascending=False)
+    
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='Coefficient', y='Feature', data=df_importance, palette='coolwarm')
+    plt.axvline(0, color='black', linestyle='-', linewidth=1)
+    plt.title('BIỂU ĐỒ FEATURE IMPORTANCE', fontsize=14, color='blue')
+    plt.xlabel('Trọng số Hệ số Hồi quy ($\\beta$)')
+    plt.ylabel('Các biến đặc trưng')
+    
+    plot_dir = os.path.join(os.getcwd(), "Part2", "plot")
+    img_path = os.path.join(plot_dir, "Feature_Importance.png")
+    plt.savefig(img_path, bbox_inches='tight', dpi=300)
+    print(f"-> Đã lưu biểu đồ Feature Importance tại: {img_path}")
+    plt.show()
+
 def main():
     print("="*60)
     print("CHƯƠNG TRÌNH SO SÁNH CÁC PHƯƠNG PHÁP ĐIỀN KHUYẾT & HỒI QUY OLS")
@@ -258,7 +348,27 @@ def main():
     print(f"Các biến bị loại bỏ: {set(X_train_full.columns) - set(final_features)}")
 
     print("\n" + "="*80)
-    print("PHẦN 3: CHÍNH QUY HÓA & SO SÁNH MÔ HÌNH")
+    print("PHẦN 3: TIẾN HÀNH TRỰC QUAN HÓA SAU MÔ HÌNH")
+    print("="*80)
+    
+    features_full = X_train_full.columns.tolist()
+    beta_hat_full = fit_ols(X_train_full, y_train_full)
+    y_pred_full = predict_ols(X_test_full, beta_hat_full)
+
+    # Vẽ 4 biểu đồ chẩn đoán phần dư cho mô hình OLS Đầy đủ
+    print("-> Đang vẽ 4 biểu đồ chẩn đoán phần dư cho mô hình OLS ĐẦY ĐỦ...")
+    plot_residual_diagnostics(
+        X_matrix=X_test_full.values, 
+        y_true=y_test_full, 
+        y_pred=y_pred_full, 
+        features_list=features_full
+    )
+    
+    # 3. Vẽ Feature Importance
+    print("-> Đang vẽ biểu đồ Feature Importance...")
+    plot_feature_importance(beta_coefficients=beta_hat_full, features_list=features_full)
+    
+    print("PHẦN 4: CHÍNH QUY HÓA & SO SÁNH MÔ HÌNH")
     print("="*80)
     
     # Tìm lambda tối ưu cho Ridge Regression
