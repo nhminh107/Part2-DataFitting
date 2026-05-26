@@ -1,7 +1,6 @@
 import os
 import sys
 
-# Cấu hình stdout để xử lý ký tự tiếng Việt trong terminal Windows
 try:
     sys.stdout.reconfigure(encoding='utf-8')
 except AttributeError:
@@ -22,6 +21,8 @@ from Part1.helper_function import (
 from Part1.ols_implementation import (
     ols_fit, model_metrics, calculate_vif, coef_inference
 )
+from Part1.ridge_lasso import ridge_fit, lasso_fit
+from Part1.cross_validation import kfold_cv
 
 from Part2.data_pipeline import DataPipeline
 import scipy.stats as stats
@@ -235,7 +236,7 @@ def main():
     print("CHƯƠNG TRÌNH SO SÁNH CÁC PHƯƠNG PHÁP ĐIỀN KHUYẾT & HỒI QUY OLS")
     print("="*60)
     
-    # 1. Đọc dữ liệu
+    # Đọc dữ liệu
     data_path = os.path.join(os.path.dirname(__file__), 'data', 'taxi_trip_pricing.csv')
     df = pd.read_csv(data_path)
     
@@ -297,7 +298,7 @@ def main():
             import traceback
             traceback.print_exc()
             
-    # 2. Hiển thị bảng kết quả
+    # Hiển thị bảng kết quả
     print("\n" + "="*80)
     print("BẢNG KẾT QUẢ SO SÁNH CÁC PHƯƠNG PHÁP XỬ LÝ DỮ LIỆU THIẾU")
     print("="*80)
@@ -306,7 +307,7 @@ def main():
     print(results_df.to_string(index=False))
     print("="*80)
     
-    # 3. Phân tích kết quả tốt nhất
+    # Phân tích kết quả tốt nhất
     best_method = results_df.sort_values(by="R2", ascending=False).iloc[0]
     print(f"\nNhận xét: Phương pháp điền khuyết tốt nhất cho mô hình OLS cơ sở là {best_method['Method']} với R2 Test đạt {best_method['R2']:.4f}.")
     print("Tất cả các mô hình OLS tính tay đều khớp kết quả của thư viện scikit-learn với sai số cực nhỏ (< 1e-12).")
@@ -332,7 +333,7 @@ def main():
     print(f"Các biến còn lại sau khi lọc VIF: {vif_selected_features}")
     
     print("\n--- Thực hiện loại bỏ biến dựa trên P-value (Backward Elimination, Alpha = 0.05) ---")
-    # Chúng ta chạy trên tập đã lọc VIF để đảm bảo t-stats ổn định
+    # Chạy trên tập đã lọc VIF để đảm bảo t-stats ổn định
     final_features = select_features_pvalue(X_train_full[vif_selected_features], y_train_full, alpha=0.05)
     print(f"Các biến còn lại cuối cùng: {final_features}")
     
@@ -366,6 +367,78 @@ def main():
     # 3. Vẽ Feature Importance
     print("-> Đang vẽ biểu đồ Feature Importance...")
     plot_feature_importance(beta_coefficients=beta_hat_full, features_list=features_full)
+    
+    print("PHẦN 4: CHÍNH QUY HÓA & SO SÁNH MÔ HÌNH")
+    print("="*80)
+    
+    # Tìm lambda tối ưu cho Ridge Regression
+    print("\n--- Tìm lambda tối ưu cho Ridge Regression ---")
+    lambdas = [0.01, 0.1, 1.0, 10.0, 100.0]
+    k_folds = 5
+    
+    X_train_list = X_train_full[final_features].values.tolist()
+    X_test_list = X_test_full[final_features].values.tolist()
+    
+    X_train_bias = add_intercept(X_train_list)
+    X_test_bias = add_intercept(X_test_list)
+    y_train_list = to_1d_list(y_train_full)
+    y_test_list = to_1d_list(y_test_full)
+    
+    best_ridge_lam = None
+    best_ridge_mse = float('inf')
+    
+    for lam in lambdas:
+        mean_mse, _ = kfold_cv(X_train_bias, y_train_list, k=k_folds, model_func=ridge_fit, seed=42, lam=lam, fit_intercept=True)
+        print(f"Ridge CV: lambda={lam:5.2f} -> Mean MSE = {mean_mse:.4f}")
+        if mean_mse < best_ridge_mse:
+            best_ridge_mse = mean_mse
+            best_ridge_lam = lam
+            
+    print(f">> Lambda tối ưu cho Ridge: {best_ridge_lam}")
+    
+    # Tìm lambda tối ưu cho Lasso Regression
+    print("\n--- Tìm lambda tối ưu cho Lasso Regression ---")
+    best_lasso_lam = None
+    best_lasso_mse = float('inf')
+    
+    for lam in lambdas:
+        mean_mse, _ = kfold_cv(X_train_bias, y_train_list, k=k_folds, model_func=lasso_fit, seed=42, lam=lam, fit_intercept=True)
+        print(f"Lasso CV: lambda={lam:5.2f} -> Mean MSE = {mean_mse:.4f}")
+        if mean_mse < best_lasso_mse:
+            best_lasso_mse = mean_mse
+            best_lasso_lam = lam
+            
+    print(f">> Lambda tối ưu cho Lasso: {best_lasso_lam}")
+    
+    print("\n--- Huấn luyện các mô hình trên tập Train và Đánh giá trên tập Test ---")
+    # Ridge
+    beta_ridge = ridge_fit(X_train_bias, y_train_list, lam=best_ridge_lam, fit_intercept=True)
+    y_pred_ridge = matvec(X_test_bias, beta_ridge)
+    
+    # Lasso
+    beta_lasso = lasso_fit(X_train_bias, y_train_list, lam=best_lasso_lam, fit_intercept=True)
+    y_pred_lasso = matvec(X_test_bias, beta_lasso)
+    
+    # Tính toán các metric
+    metrics_ridge = calculate_metrics(y_test_list, y_pred_ridge)
+    metrics_lasso = calculate_metrics(y_test_list, y_pred_lasso)
+    
+    models = {
+        "OLS Cơ bản (Đầy đủ)": results_df.sort_values(by="R2", ascending=False).iloc[0].to_dict(),
+        "OLS Chọn biến": metrics_final,
+        f"Ridge (lam={best_ridge_lam})": metrics_ridge,
+        f"Lasso (lam={best_lasso_lam})": metrics_lasso
+    }
+    
+    print("\n" + "="*80)
+    print("BẢNG KẾT QUẢ SO SÁNH HIỆU NĂNG CÁC MÔ HÌNH TRÊN TẬP TEST")
+    print("="*80)
+    print(f"{'Mô hình':<25} | {'MAE':<10} | {'RMSE':<10} | {'R2 Test':<10}")
+    print("-" * 65)
+    for name, m in models.items():
+        r2_val = m.get("R2", m.get("R2 Test", 0.0))
+        print(f"{name:<25} | {m['MAE']:<10.4f} | {m['RMSE']:<10.4f} | {r2_val:<10.4f}")
+    print("="*80)
 
 if __name__ == '__main__':
     main()
