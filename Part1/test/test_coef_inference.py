@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ols_implementation import ols_fit, coef_inference
+from Part1.ols_implementation import ols_fit, coef_inference
 
 class TestCoefInference(unittest.TestCase):
 

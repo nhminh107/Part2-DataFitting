@@ -10,9 +10,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-import matplotlib.pyplot as plt
-import seaborn as sns
-# Thêm gốc dự án vào python path để import Part1 và Part2
+
+# Add root to python path to import modules using absolute paths (e.g., Part1.module)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Part1.helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 

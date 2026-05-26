@@ -6,8 +6,8 @@ import numpy as np
 # Thêm thư mục cha vào sys.path để import được module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ols_implementation import hat_matrix
-from helper_function import add_intercept
+from Part1.ols_implementation import hat_matrix
+from Part1.helper_function import add_intercept
 
 class TestHatMatrix(unittest.TestCase):
 

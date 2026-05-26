@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import KFold
 from sklearn.metrics import mean_squared_error
-from ridge_lasso import ridge_fit
-from cross_validation import kfold_cv
+from Part1.ridge_lasso import ridge_fit
+from Part1.cross_validation import kfold_cv
 
 def test_ridge_regression():
     print("--- Testing Ridge Regression ---")
