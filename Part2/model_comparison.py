@@ -12,8 +12,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 
-# Add Part1 to python path to import the custom matrix functions
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'Part1')))
+# Add root to python path to import modules using absolute paths (e.g., Part1.module)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Part1.helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 
     matmul, matvec, invert_matrix, add_intercept

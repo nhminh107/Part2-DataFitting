@@ -1,4 +1,9 @@
 import numpy as np
+import sys
+import os
+
+# Cho phép import Part1, Part2 khi chạy file trực tiếp
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 class KernelRidgeRegression:
     def __init__(self, lmbda: float = 1.0, length_scale: float = 1.0):

@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt 
 import os
 import sys
+# Add root to python path to import modules using absolute paths (e.g., Part1.module)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from Part1.helper_function import matmul
 from sklearn.impute import KNNImputer
 from sklearn.experimental import enable_iterative_imputer

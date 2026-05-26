@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from Part1.helper_function import (
     to_2d_list, to_1d_list, transpose_matrix, 
     matmul, matvec, invert_matrix, add_intercept

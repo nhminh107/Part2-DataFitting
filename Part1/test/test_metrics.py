@@ -9,8 +9,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score
-from ols_implementation import model_metrics, calculate_vif, ols_fit
-from helper_function import add_intercept, matvec
+from Part1.ols_implementation import model_metrics, calculate_vif, ols_fit
+from Part1.helper_function import add_intercept, matvec
 class TestOLSMetricsLoc(unittest.TestCase):
     def setUp(self):
         #tạo dữ liệu giả lập
