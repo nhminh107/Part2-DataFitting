@@ -24,12 +24,12 @@ class CustomRidge:
         self.beta = None
 
     def fit(self, X, y):
-        # Convert to list of lists and add intercept (first column)
+        #Chuyển đổi sang list of lists và thêm intercept (cột đầu tiên)
         X_list = X.values.tolist()
         for row in X_list:
             row.insert(0, 1.0)
         y_list = y.values.tolist()
-        # Use custom ridge_fit from Part1
+        # Sử dụng hàm ridge_fit tùy chỉnh từ Part1
         self.beta = ridge_fit(X_list, y_list, self.alpha, fit_intercept=True)
 
     def predict(self, X):
@@ -45,7 +45,8 @@ class CustomRidge:
 
 
 
-# Set default settings
+
+# Thiết lập các tùy chọn mặc định
 pd.set_option('display.max_columns', None)
 
 class DataPipeline: 
@@ -54,15 +55,15 @@ class DataPipeline:
         self.handle_outliers = handle_outliers
         self.target_col = target_col
         
-        # 1. Standardize Data Path Handling
+        # 1. Chuẩn hóa việc xử lý đường dẫn dữ liệu
         if data_path is None:
-            # Default to data folder relative to this script's location
+            # Mặc định lấy thư mục dữ liệu tương đối so với vị trí script này
             base_dir = os.path.dirname(os.path.abspath(__file__))
             data_path = os.path.join(base_dir, "data", "taxi_trip_pricing.csv")
         
         self.df = pd.read_csv(data_path) if os.path.exists(data_path) else None
         
-        # 2. Ordinal Mappings Setup
+        # 2. Thiết lập ánh xạ thứ tự (Ordinal Mappings)
         if ordinal_mappings is None:
             self.ordinal_mappings = {
                 'Time_of_Day': ['Morning', 'Afternoon', 'Evening', 'Night'],
@@ -71,7 +72,7 @@ class DataPipeline:
         else:
             self.ordinal_mappings = ordinal_mappings
 
-        # Containers for training statistics
+        # Các biến lưu trữ thống kê trong quá trình huấn luyện
         self.impute_values = {}
         self.scale_means = {}
         self.scale_stds = {}
@@ -80,14 +81,14 @@ class DataPipeline:
         self.numeric_cols = []
         self.dummy_columns_map = {}
         
-        # Imputers
+        # Các bộ điền khuyết (Imputers)
         self.knn_imputer = None
         self.mice_imputer = None
         self.regression_models = {}
 
     def EDA(self):
         if self.df is None:
-            print("No data available to perform EDA.")
+            print("Không có dữ liệu để thực hiện EDA.")
             return
             
         print("########## THỐNG KÊ MÔ TẢ ############")
@@ -97,7 +98,7 @@ class DataPipeline:
         print("########## PHÂN PHỐI TỪNG BIẾN ##########")
         numeric_col = self.df.select_dtypes(include=np.number).columns
         
-        # Ensure the plot directory exists
+        # Đảm bảo thư mục lưu biểu đồ tồn tại
         plot_dir = os.path.join(os.getcwd(), "Part2", "plot")
         if not os.path.exists(plot_dir):
             plot_dir = os.path.join(os.getcwd(), "plot")
@@ -107,7 +108,7 @@ class DataPipeline:
             fig, axes = plt.subplots(1, 2, figsize=(12,5))
             sns.histplot(self.df[col], kde=True, ax=axes[0])
             sns.boxplot(x=self.df[col], ax=axes[1]) 
-            fig.suptitle("Histogram & boxplot of " + str(col), color='blue', ha='center')
+            fig.suptitle("Histogram & boxplot của " + str(col), color='blue', ha='center')
             plt_name = os.path.join(plot_dir, "EDA_" + str(col) + ".png")
             plt.savefig(plt_name, bbox_inches='tight')
             plt.show()
@@ -117,20 +118,20 @@ class DataPipeline:
 
         plt.figure(figsize=(12,8))
         sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
-        plt.suptitle("Correlation Matrix (Numerical feature only)")
+        plt.suptitle("Ma trận tương quan (Chỉ các biến số)")
         corr_img_path = os.path.join(plot_dir, "Correlation_Matrix.png")
         plt.savefig(corr_img_path, bbox_inches='tight')
         plt.show()
 
-        print("########## CHECK DUPLICATES ###########")
-        print(f"Số records trùng lặp: {self.df.duplicated().sum()}")
+        print("########## KIỂM TRA DỮ LIỆU TRÙNG LẶP ###########")
+        print(f"Số bản ghi trùng lặp: {self.df.duplicated().sum()}")
 
-        print("########## MISSING VALUES #############")
-        # 1. Tính toán dữ liệu thiếu
+        print("########## DỮ LIỆU THIẾU (MISSING VALUES) #############")
+        # 1. Tính toán lượng dữ liệu thiếu
         missing_count = self.df.isnull().sum()
         missing_percentage = (missing_count / len(self.df)) * 100
 
-        # 2. Tạo một DataFrame để quản lý dữ liệu thiếu (chỉ lấy các cột có missing > 0)
+        # 2. Tạo DataFrame để quản lý dữ liệu thiếu (chỉ lấy các cột có dữ liệu thiếu > 0)
         missing_df = pd.DataFrame({
             'Column': missing_count.index,
             'Missing Count': missing_count.values,
@@ -139,7 +140,7 @@ class DataPipeline:
 
         missing_df = missing_df[missing_df['Missing Count'] > 0]
 
-        # 3. Vẽ biểu đồ
+        # 3. Vẽ biểu đồ dữ liệu thiếu
         if not missing_df.empty:
             fig, ax1 = plt.subplots(figsize=(12, 6))
 
@@ -165,7 +166,7 @@ class DataPipeline:
         else:
             print("Không có dữ liệu thiếu trong DataFrame.")     
 
-        print("######### PHÁT HIỆN OUTLIERS - Phương pháp IQR ##############")
+        print("######### PHÁT HIỆN NGOẠI LAI (OUTLIERS) - Phương pháp IQR ##############")
         q_25 = summary.loc['25%']
         q_75 = summary.loc['75%']
 
@@ -240,7 +241,7 @@ class DataPipeline:
             for col in self.numeric_cols:
                 X_temp[col] = X_temp[col].fillna(self.impute_values[col])
             
-            # One-hot encode with float cast to prevent boolean type dummies
+            # One-hot encode với float cast để tránh các cột dummy kiểu boolean
             X_temp_encoded = pd.get_dummies(X_temp, columns=self.categorical_cols, drop_first=True).astype(float)
             
             self.regression_models = {}
@@ -313,9 +314,9 @@ class DataPipeline:
         for col in nominal_cols:
             unique_vals = sorted(X_imputed[col].unique().tolist())
             if len(unique_vals) > 1:
-                self.dummy_columns_map[col] = unique_vals[1:] # Drop first
+                self.dummy_columns_map[col] = unique_vals[1:] # Bỏ cột đầu tiên
             else:
-                self.dummy_columns_map[col] = [] # Avoid dummy trap if 1 category
+                self.dummy_columns_map[col] = [] # Tránh bẫy dummy nếu chỉ có 1 loại
 
     def _apply_ordinal_encoding(self, X_df):
         X_encoded = X_df.copy()
@@ -343,7 +344,7 @@ class DataPipeline:
         y_df = None
         if y is not None:
             y_df = pd.Series(y, index=X_df.index)
-            # drop rows where target is NaN
+            # loại bỏ các dòng có mục tiêu bị thiếu
             non_nan_y_mask = y_df.notnull()
             X_df = X_df[non_nan_y_mask]
             y_df = y_df[non_nan_y_mask]
@@ -360,7 +361,7 @@ class DataPipeline:
             nan_rows = X_df.isnull().any(axis=1)
             X_df = X_df[~nan_rows]
             if y_df is not None:
-                y_df = y_df[~nan_rows]
+                y_df = y_df.loc[~nan_rows]
             X_imputed = X_df
         else:
             X_imputed = self._apply_imputation(X_df)
@@ -369,6 +370,16 @@ class DataPipeline:
             for col in self.numeric_cols:
                 lower, upper = self.outlier_bounds[col]
                 X_imputed[col] = X_imputed[col].clip(lower, upper)
+        elif self.handle_outliers == 'drop':
+            # Xác định các dòng có BẤT KỲ outlier nào trong các cột số
+            is_outlier = pd.Series(False, index=X_imputed.index)
+            for col in self.numeric_cols:
+                lower, upper = self.outlier_bounds[col]
+                is_outlier = is_outlier | (X_imputed[col] < lower) | (X_imputed[col] > upper)
+            
+            X_imputed = X_imputed[~is_outlier]
+            if y_df is not None:
+                y_df = y_df.loc[~is_outlier]
                 
         X_encoded = self._apply_ordinal_encoding(X_imputed)
         X_encoded = self._apply_nominal_encoding(X_encoded)
