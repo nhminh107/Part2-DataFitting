@@ -50,10 +50,12 @@ class CustomRidge:
 pd.set_option('display.max_columns', None)
 
 class DataPipeline: 
-    def __init__(self, data_path=None, imputation_method='knn', handle_outliers='winsorize', target_col='Trip_Price', ordinal_mappings=None):
+    def __init__(self, data_path=None, imputation_method='knn', handle_outliers='winsorize', target_col='Trip_Price', ordinal_mappings=None, log_transform_cols=None, poly_degree=1):
         self.imputation_method = imputation_method
         self.handle_outliers = handle_outliers
         self.target_col = target_col
+        self.log_transform_cols = log_transform_cols if log_transform_cols is not None else []
+        self.poly_degree = poly_degree
         
         # 1. Chuẩn hóa việc xử lý đường dẫn dữ liệu
         if data_path is None:
@@ -381,21 +383,46 @@ class DataPipeline:
             if y_df is not None:
                 y_df = y_df.loc[~is_outlier]
                 
+        # 3. Kỹ thuật đặc trưng 
+        # 3.1 Biến đổi Logarit
+        for col in self.log_transform_cols:
+            if col in X_imputed.columns:
+                # log(x + 1) để xử lý giá trị 0, đảm bảo giá trị dương bằng cách clip
+                X_imputed[f"log_{col}"] = np.log1p(np.maximum(0, X_imputed[col]))
+        
+        # 3.2 Đặc trưng Đa thức
+        if self.poly_degree >= 2:
+            poly_cols = self.numeric_cols # Áp dụng cho các cột số gốc
+            for col in poly_cols:
+                X_imputed[f"{col}^2"] = X_imputed[col] ** 2
+                
+        # 4. Mã hóa biến phân loại
+        # Đầu tiên áp dụng ordinal encoding, sau đó là nominal
         X_encoded = self._apply_ordinal_encoding(X_imputed)
         X_encoded = self._apply_nominal_encoding(X_encoded)
         
+        # Thêm các biến mới vào danh sách chuẩn hóa
         all_numeric_cols = list(self.numeric_cols)
+        # Thêm biến ordinal
         for col in self.ordinal_mappings.keys():
             if col in X_encoded.columns and col not in all_numeric_cols:
                 all_numeric_cols.append(col)
+        
+        # Thêm biến log và poly
+        for col in X_encoded.columns:
+            if (col.startswith("log_") or col.endswith("^2")) and col not in all_numeric_cols:
+                all_numeric_cols.append(col)
+        
+        # Đảm bảo mean/std tồn tại cho tất cả numeric_cols
+        for col in all_numeric_cols:
+            if col in X_encoded.columns:
                 if col not in self.scale_means:
                     self.scale_means[col] = X_encoded[col].mean()
                     self.scale_stds[col] = X_encoded[col].std()
                     if pd.isna(self.scale_stds[col]) or self.scale_stds[col] == 0:
                         self.scale_stds[col] = 1.0
-        
-        for col in all_numeric_cols:
-            if col in X_encoded.columns:
+                
+                # 5. Chuẩn hóa
                 X_encoded[col] = (X_encoded[col] - self.scale_means[col]) / self.scale_stds[col]
             
         if y_df is not None:
