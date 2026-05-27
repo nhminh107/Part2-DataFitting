@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Add root to python path to import modules using absolute paths (e.g., Part1.module)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
