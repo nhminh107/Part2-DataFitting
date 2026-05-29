@@ -1,0 +1,53 @@
+\documentclass[12pt,a4paper]{article}
+
+% ---------- Encoding & Language ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T5]{fontenc}
+\usepackage[vietnamese]{babel}
+\usepackage{booktabs}
+\usepackage{tabularx}
+% ---------- Math ----------
+\usepackage{amsmath, amssymb}
+
+% ---------- Graphics ----------
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{qrcode}
+\usepackage{longtable}
+\usepackage{array}
+% ---------- Page Layout ----------
+\usepackage{geometry}
+\geometry{
+  left=3cm,
+  right=2.5cm,
+  top=3cm,
+  bottom=3cm
+}
+
+% ---------- Header / Footer ----------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textit{Báo cáo đồ án 2}}
+\fancyhead[R]{\textit{Toán Ứng Dụng và Thống Kê - MTH00051}}
+\fancyfoot[C]{\thepage}
+
+% ---------- Line Spacing ----------
+\usepackage{setspace}
+\setstretch{1.3}
+
+% ---------- Import styles ----------
+\input{styles/code}
+\input{styles/boxes}
+\input{styles/layout}
+
+\begin{document}
+
+\input{sections/title}
+
+\tableofcontents
+\newpage
+
+\input{sections/exercise}
+
+\end{document}
